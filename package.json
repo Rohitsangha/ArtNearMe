@@ -5,10 +5,13 @@
   "dependencies": {
     "@elastic/datemath": "^5.0.3",
     "@elastic/eui": "^27.0.0",
+    "@targomo/core": "^0.3.1",
+    "@targomo/leaflet": "0.0.9",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
     "leaflet": "^1.6.0",
+    "leaflet.vectorgrid": "^1.3.0",
     "moment": "^2.27.0",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
