@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import { EuiSuperSelect} from '@elastic/eui';
 
@@ -23,11 +23,7 @@ const Superselect = ({value,setValue, choose}) => {
         inputDisplay: (
                 <div style={{fontSize:"1.05rem"}}><i className="fas fa-car"></i> Car</div>
         )},
-        {
-            value: 'transit',
-            inputDisplay: (
-                <div style={{fontSize:"1.05rem"}}><i className="fas fa-train"></i> Transit</div>
-            )},
+        
         ]
     }
     else {
@@ -76,6 +72,7 @@ const Superselect = ({value,setValue, choose}) => {
           options={options}
           valueOfSelected={value}
           onChange={value => onChange(value)}
+          fullWidth
         />
 
         );
