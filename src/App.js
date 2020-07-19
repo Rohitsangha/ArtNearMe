@@ -3,7 +3,7 @@ import React, {useState} from 'react';
 import '@elastic/eui/dist/eui_theme_dark.css';
 import styles from"./App.module.css";
 
-import { Header, Superselect} from './components';
+import { Header, Superselect, Legend} from './components';
 
 import {Map, TileLayer, Marker, Popup, Polygon} from "react-leaflet";
 
@@ -12,6 +12,7 @@ import { TargomoClient } from '@targomo/core';
 import * as art from './assets/art1.json';
 
 import { Icon } from 'leaflet';
+
 
 
 import {
@@ -200,14 +201,19 @@ const App = () => {
 
         function pointInPoly(marker) {
 
-            var x = marker.fields.geom.coordinates[1], y = marker.fields.geom.coordinates[0]
+            let x = marker.fields.geom.coordinates[1]
+            let y = marker.fields.geom.coordinates[0]
         
-            var inside = false;
+            let inside = false;
+
             for (var i = 0, j = box.length - 1; i < box.length; j = i++) {
-                var xi = box[i][0], yi = box[i][1];
-                var xj = box[j][0], yj = box[j][1];
+
+                let xi = box[i][0];
+                let yi = box[i][1];
+                let xj = box[j][0]; 
+                let yj = box[j][1];
         
-                var intersect = ((yi > y) != (yj > y))
+                let intersect = ((yi > y) != (yj > y))
                     && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
                 if (intersect) inside = !inside;
             }
@@ -215,24 +221,22 @@ const App = () => {
             return inside;
         };
 
-        for(let i=0; i<614; i++) {
+        //loop through art JSON file to see if they fallinside max polygon
+        for(let i=0; i<200; i++) {
 
             try{
                 
                 let test = pointInPoly(testing[i]);
                 if (test) {
-                shownMarkers.push({
-                    pos:[testing[i].fields.geom.coordinates[1], testing[i].fields.geom.coordinates[0]],
-                    type: testing[i].fields.type,
-                    add: testing[i].fields.siteaddress,
-                    desc: testing[i].fields.descriptionofwork
-                })
+                    shownMarkers.push({
+                        pos:[testing[i].fields.geom.coordinates[1], testing[i].fields.geom.coordinates[0]],
+                        type: testing[i].fields.type,
+                        add: testing[i].fields.siteaddress,
+                        desc: testing[i].fields.descriptionofwork
+                    });}
 
-            }
-            } catch(err){
-            }
+            } catch(err){}
         }
-
         setNewMarker(shownMarkers);
     }
     
@@ -321,7 +325,7 @@ const App = () => {
                                 </Popup>
                             </Marker>
                             ))}
-                        
+                        <Legend />
                     </Map>
 
     
