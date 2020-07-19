@@ -1,16 +1,18 @@
-import React, {useState, forceUpdate} from 'react';
-
+import React, {useState} from 'react';
 
 import '@elastic/eui/dist/eui_theme_dark.css';
 import styles from"./App.module.css";
 
 import { Header, Superselect} from './components';
 
-import {Map, TileLayer, Marker, Popup, Polygon, MapLayer,GeoJSON} from "react-leaflet";
+import {Map, TileLayer, Marker, Popup, Polygon} from "react-leaflet";
 
-import { TargomoClient } from '@targomo/core' 
+import { TargomoClient } from '@targomo/core';
 
-import * as art from './assets/art1.json'
+import * as art from './assets/art1.json';
+
+import { Icon } from 'leaflet';
+
 
 import {
     EuiPage,
@@ -20,16 +22,20 @@ import {
     EuiFieldSearch,
     EuiButton,
     EuiForm,
+    EuiCallOut
   } from '@elastic/eui';
+
 
 const App = () => {
 
     //State monitors
     const [polygon,updatepoly] = useState([]);
     const [source,updatesource] = useState([]);
-    const [valueMode, setValueMode] = useState('car');
+    const [valueMode, setValueMode] = useState('walk');
     const [valueTime, setValueTime] = useState('300');
-    const [newInput, setNewInput] = useState('') 
+    const [newInput, setNewInput] = useState('');
+    const [markers, setNewMarker] = useState([]);
+    const [warningMessage, setWM] = useState(false);
     
 
     //Api keys **move to env file
@@ -40,14 +46,18 @@ const App = () => {
     //reference to <Map> element 
     let mapRef = React.useRef();
 
+    //art icon
+    const icon = new Icon({
+        iconUrl: require("./brush.svg"),
+        iconSize: [20, 20]
+      });
+
+
     //defining basemap
     const tilesUrl = `https://api.maptiler.com/maps/positron/{z}/{x}/{y}@2x.png?key=${mapKey}`;
   
     //Mapping Data
     const center = [49.2827, -123.1207];
-
-    //console.log(art[0].fields.descriptionofwork);
-
 
     function initMap(type,time,source) {
 
@@ -64,6 +74,7 @@ const App = () => {
 
         //reference to map current
         const map = mapRef.current;
+        map.leafletElement.attributionControl.addAttribution('Rohit Sangha');
       
         // polygons time rings
         let travelTimes = undefined;
@@ -131,14 +142,12 @@ const App = () => {
             }
         }
 
-        console.log(travelTimes);
 
         //Polygon options object creator for leaflet display
         async function createPoly(tt,color) {
         
                 let options = callOptions(type,tt,maxEdgeWeight);
                 const polygonstest = await client.polygons.fetch(sources, options);
-                console.log(polygonstest);
                 let index = 0;
 
                 tt.forEach(timeVal => {
@@ -155,7 +164,7 @@ const App = () => {
 
 
         // Async function to see if both fetch calls are completed
-        
+
         async function caller() {
         await createPoly(travelTimes,colors1)
 
@@ -163,14 +172,76 @@ const App = () => {
             await createPoly(TravelTimes2,colors2)
         }
 
-        updatepoly(rPolyObject.reverse())
+        //Zoom to polygon bounding box
+        let minY = 90;
+        let minX = 180;
+        let maxY = 0;
+        let maxX = -180;
+
+        let box = rPolyObject.reverse();
+        box = box[0].position
+
+        for(let i = 0; i < box.length; i++) {
+           if (box[i][0] > maxY) maxY = box[i][0]
+           if (box[i][0] < minY) minY = box[i][0]
+           if (box[i][1] > maxX) maxX = box[i][1]
+           if (box[i][1] < minX) minX = box[i][1]
+
+        }
+
+        map.leafletElement.fitBounds([[maxY,maxX],[minY,minX]])
+        
+        //Update polygon object
+        updatepoly(rPolyObject)
+
+        //Run ray casting algorithm to check if point is in polygon.
+        let shownMarkers = [];
+        let testing = art.default;
+
+        function pointInPoly(marker) {
+
+            var x = marker.fields.geom.coordinates[1], y = marker.fields.geom.coordinates[0]
+        
+            var inside = false;
+            for (var i = 0, j = box.length - 1; i < box.length; j = i++) {
+                var xi = box[i][0], yi = box[i][1];
+                var xj = box[j][0], yj = box[j][1];
+        
+                var intersect = ((yi > y) != (yj > y))
+                    && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+        
+            return inside;
+        };
+
+        for(let i=0; i<614; i++) {
+
+            try{
+                
+                let test = pointInPoly(testing[i]);
+                if (test) {
+                shownMarkers.push({
+                    pos:[testing[i].fields.geom.coordinates[1], testing[i].fields.geom.coordinates[0]],
+                    type: testing[i].fields.type,
+                    add: testing[i].fields.siteaddress,
+                    desc: testing[i].fields.descriptionofwork
+                })
+
+            }
+            } catch(err){
+            }
+        }
+
+        setNewMarker(shownMarkers);
     }
-     
+    
+    //Call Async Function
     caller()
 
     }
 
-    //Search function calls geocodify api then initMap function
+    //onSubmit search function calls geocodify api then call initMap function
     const search = (event) => {
 
         event.preventDefault();
@@ -181,7 +252,13 @@ const App = () => {
         fetch(`https://api.geocodify.com/v2/geocode?api_key=${geoKey}&q=${newInput}`)
         .then(res => res.json())
         .then(data => data.response.features[0].geometry.coordinates)
-        .then(data => {initMap(type,time,data)});
+        .then(data => {initMap(type,time,data)})
+        .catch(error => {
+            //Show warning message for 3 seconds on error
+            setWM(true)
+            setNewInput('')
+            setTimeout(()=>setWM(false),3000)
+        });
     
         
     }
@@ -195,6 +272,10 @@ const App = () => {
         <EuiPage>
 
             <EuiPageSideBar>
+
+                {warningMessage ? ( 
+                <EuiCallOut title="Unvalid location. Please try again." color="danger" iconType="alert" style={{marginBottom:'20px'}}> </EuiCallOut>
+                ) : (<></>)}
 
                 <EuiForm component="form" onSubmit={search}>
 
@@ -223,13 +304,24 @@ const App = () => {
 
                     {/* Importing leaflet map and baselayer */}
 
-                    <Map className={styles.leaflet} center={center} zoom={11} scrollWheelZoom={false} ref={mapRef}>
+                    <Map className={styles.leaflet} center={center} zoom={11} scrollWheelZoom={false} ref={mapRef} zoomSnap={0}>
 
                         <TileLayer url={tilesUrl} tileSize={512} crossOrigin="true" minZoom={6} zoomOffset={-1}/>
 
                         {source.map(data => (<Marker position={data}></Marker>))}
-                        {polygon.map(data => (<Polygon color={data.color} positions={data.position} opacity="0"></Polygon>))}
-                    
+                        {polygon.map(data => (<Polygon color={data.color} positions={data.position} opacity="0" ></Polygon>))}
+                        {markers.map(data => (
+                            <Marker position={data.pos} icon={icon} riseOnHover="true">
+                                <Popup className={styles.test}>
+                                        <div className={styles.popup}>
+                                        Type: {data.type} <br /> <br />
+                                        Location: {data.add} <br /> <br />
+                                        Description: {data.desc}
+                                        </div>
+                                </Popup>
+                            </Marker>
+                            ))}
+                        
                     </Map>
 
     
